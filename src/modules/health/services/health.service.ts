@@ -4,6 +4,7 @@ import { Result } from '../../../constants/result';
 import { dataSource } from '../../../db/datasource';
 import { ErrorResult, SuccessResult } from '../../../interfaces/results';
 import { defaultQueue } from '../../../queue/queue';
+import { REDIS_QUEUE_ENABLED } from '../../../queue/config.constants';
 import { LogHelper } from '../../../utils/log-helper';
 
 export function checkDatabaseConnection(): Promise<
@@ -42,7 +43,7 @@ export function checkRedisCacheConnection(): Promise<SuccessResult<'CONNECTED'> 
 }
 
 type RedisQueueHealth = {
-	connection: 'PONG';
+	connection: 'PONG' | 'DISABLED';
 	activeCount: number;
 	waitingCount: number;
 	completedCount: number;
@@ -50,6 +51,19 @@ type RedisQueueHealth = {
 };
 
 export function checkRedisQueHealth(): Promise<SuccessResult<RedisQueueHealth> | ErrorResult> {
+	if (!REDIS_QUEUE_ENABLED || !defaultQueue) {
+		return Promise.resolve({
+			type: Result.SUCCESS,
+			data: {
+				connection: 'DISABLED',
+				activeCount: 0,
+				waitingCount: 0,
+				completedCount: 0,
+				failedCount: 0,
+			},
+		});
+	}
+
 	return Promise.all([
 		pingRedisQueueWithTimeout(),
 		defaultQueue.getActiveCount(),
@@ -80,6 +94,10 @@ export function checkRedisQueHealth(): Promise<SuccessResult<RedisQueueHealth> |
 }
 
 function pingRedisQueueWithTimeout(): Promise<'PONG'> {
+	if (!defaultQueue) {
+		return Promise.reject(new Error('Redis queue is disabled'));
+	}
+
 	return defaultQueue.client.then((client: RedisClient) => {
 		return Promise.race([
 			client.ping(),

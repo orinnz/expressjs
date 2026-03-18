@@ -1,6 +1,6 @@
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 require('dotenv').config();
-import { dataSource } from './src/db/datasource';
+import { dataSource } from './datasource';
 
 dataSource
 	.initialize()
